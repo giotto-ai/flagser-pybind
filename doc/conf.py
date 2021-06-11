@@ -13,9 +13,13 @@
 import os
 import sys
 
-from pyflagser import __version__
-
+# This line should be called before importing pyflagser
+# Otherwise it would be necessary to install the package in order to compile
+# the documentation
 sys.path.insert(0, os.path.abspath('../'))
+
+from pyflagser import __version__ # noqa
+
 
 # -- Project information -----------------------------------------------------
 

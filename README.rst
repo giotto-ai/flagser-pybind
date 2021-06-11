@@ -66,7 +66,6 @@ C++ dependencies:
 
 -  C++14 compatible compiler
 -  CMake >= 3.9
--  Boost >= 1.56
 
 Source code
 '''''''''''

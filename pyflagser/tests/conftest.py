@@ -2,7 +2,7 @@ import os
 from tempfile import mkdtemp
 from urllib.request import urlopen, urlretrieve
 
-from ..modules.flagser_pybind import AVAILABLE_FILTRATIONS
+from pyflagser.modules.flagser_pybind import AVAILABLE_FILTRATIONS
 
 files_with_filtration_results = ["d5.flag"]
 large_files = ['medium-test-data.flag', 'd10.flag']

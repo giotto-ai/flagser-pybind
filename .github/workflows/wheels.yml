@@ -1,0 +1,52 @@
+name: Build Wheels
+
+on : workflow_dispatch
+
+jobs:
+
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }} for ${{ github.event.repository.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        name: Install Python
+
+      - name: Build wheels
+        uses: joerick/cibuildwheel@v1.10.0
+        env:
+          # Specify which Python versions to build wheels
+          # https://cibuildwheel.readthedocs.io/en/stable/options/#build-skip
+          CIBW_BUILD: "cp36-* cp37-* cp38-* cp39-*"
+          # Skip 32 bit architectures
+          CIBW_SKIP: "*-win32 *-manylinux_i686"
+          CIBW_BEFORE_BUILD: python -m pip install cmake
+          CIBW_TEST_COMMAND: python -m pyflagser.tests --webdl --no-cov
+          CIBW_TEST_REQUIRES: pytest pytest-cov
+
+      - uses: actions/upload-artifact@v2
+        name: Upload wheels
+        with:
+          path: ./wheelhouse/*.whl
+
+  build_wheels_apple_silicon:
+    name: Build wheels for apple silicon
+    runs-on: macos-10.15
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build wheels
+        uses: joerick/cibuildwheel@v1.10.0
+        env:
+          CIBW_ARCHS_MACOS: arm64
+
+      - uses: actions/upload-artifact@v2
+        name: Upload ARM wheels
+        with:
+          path: ./wheelhouse/*.whl

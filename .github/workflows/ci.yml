@@ -1,0 +1,72 @@
+name: Build package on different OSs and Python versions
+
+on : [push, pull_request]
+
+jobs:
+
+  build_package:
+    name: Build ${{ github.event.repository.name }} on ${{ matrix.os }} for Python-${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: [3.6, 3.7, 3.8, 3.9]
+        include:
+          - os: ubuntu-latest
+            path: ~/.cache/pip
+          - os: macos-latest
+            path: ~/Library/Caches/pip
+          - os: windows-latest
+            path: ~\AppData\Local\pip\Cache
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        name: Install Python-${{ matrix.python-version }} 
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Activating Python cache
+        uses: actions/cache@v2
+        id: cache_python
+        continue-on-error: true
+        with:
+          path: ${{ matrix.path }}
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt') }}
+
+      - name: Build ${{ github.event.repository.name }}
+        run: |
+          python -m pip install -e ".[doc, tests]"
+
+      - name: Install and run flake8 on Mac
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          flake8
+
+      - name: Run test on Mac with coverage generated
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          pytest --cov pyflagser --cov-report xml
+
+      - name: Run test on Linux and Windows with no coverage generated
+        if: ${{ runner.os != 'macOS' }}
+        run: |
+          python -m pytest --no-cov --no-coverage-upload
+
+      - name: Build sphinx doc on Linux
+        uses: ammaraskar/sphinx-action@master
+        if: ${{ runner.os == 'Linux' }}
+        with:
+          docs-folder: "doc/"
+
+      - name: Upload as artifac builded documentation and coverage
+        uses: actions/upload-artifact@v2
+        with:
+          name: ArtifactsCI
+          if-no-files-found: ignore
+          path: |
+            doc/build/html/
+            coverage.xml
+            htmlcov
