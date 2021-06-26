@@ -9,7 +9,8 @@ from .modules.flagser_coeff_pybind import compute_homology as \
 
 
 def flagser_unweighted(adjacency_matrix, min_dimension=0, max_dimension=np.inf,
-                       directed=True, coeff=2, approximation=None):
+                       directed=True, coeff=2, approximation=None,
+                       in_memory=False):
     """Compute homology of a directed/undirected flag complex.
 
     From an adjacency_matrix construct all cells forming its associated flag
@@ -47,6 +48,11 @@ def flagser_unweighted(adjacency_matrix, min_dimension=0, max_dimension=np.inf,
         often ``100,000``. Increase for higher precision, decrease for faster
         computation. If ``None``, no approximation is made and all cells are
         used. For more details, please refer to [1]_.
+
+    in_memory: bool, optional, default: ``False``
+        If ``True``, speeds up computation at the cost of increased memory
+        consumption, by enabling an efficient lookup in the data structure
+        instead of relying on hashing for looking up simplex indices.
 
     Returns
     -------
@@ -101,7 +107,7 @@ def flagser_unweighted(adjacency_matrix, min_dimension=0, max_dimension=np.inf,
     # Call flagser binding
     homology = _compute_homology(vertices, edges, min_dimension,
                                  _max_dimension, directed, coeff,
-                                 _approximation, _filtration)[0]
+                                 _approximation, _filtration, in_memory)[0]
 
     # Creating dictionary of return values
     out = {
@@ -114,7 +120,7 @@ def flagser_unweighted(adjacency_matrix, min_dimension=0, max_dimension=np.inf,
 
 def flagser_weighted(adjacency_matrix, max_edge_weight=None, min_dimension=0,
                      max_dimension=np.inf, directed=True, filtration="max",
-                     coeff=2, approximation=None):
+                     coeff=2, approximation=None, in_memory=False):
     """Compute persistent homology of a directed/undirected filtered flag
     complex.
 
@@ -184,6 +190,11 @@ def flagser_weighted(adjacency_matrix, max_edge_weight=None, min_dimension=0,
         computation. If ``None``, no approximation is made and all cells are
         used. For more details, please refer to [1]_.
 
+    in_memory: bool, optional, default: ``False``
+        If ``True``, speeds up computation at the cost of increased memory
+        consumption, by enabling an efficient lookup in the data structure
+        instead of relying on hashing for looking up simplex indices.
+
     Returns
     -------
     out : dict of list
@@ -247,7 +258,7 @@ def flagser_weighted(adjacency_matrix, max_edge_weight=None, min_dimension=0,
     # Call flagser binding
     homology = _compute_homology(vertices, edges, min_dimension,
                                  _max_dimension, directed, coeff,
-                                 _approximation, filtration)[0]
+                                 _approximation, filtration, in_memory)[0]
 
     # Create dictionary of return values
     out = {

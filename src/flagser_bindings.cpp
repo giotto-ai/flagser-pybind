@@ -1,11 +1,10 @@
-#include <iostream>
-#include <string>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <stdio.h>
 
 #include <flagser/src/flagser.cpp>
-
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
+#include <iostream>
+#include <string>
 
 namespace py = pybind11;
 
@@ -15,36 +14,79 @@ PYBIND11_MODULE(flagser_coeff_pybind, m) {
 PYBIND11_MODULE(flagser_pybind, m) {
 #endif
 
+  /* `persistence_computer_t<T>` class requires to know if the computation is
+   * in memory or not. Because, `persistence_computer_t<T>` contains the method
+   * to retrieve the different results of the homology computation.
+   * This class allows to store results from the computation independently if
+   * it was in memory or not.
+   * This duplicates the code in `persistence_computer_t`.
+   */
+  class PersistenceValues {
+   public:
+    PersistenceValues();
+    PersistenceValues(index_t eu, std::vector<size_t> bn,
+                      std::vector<std::vector<std::pair<value_t, value_t>>> bd,
+                      std::vector<size_t> cc)
+        : euler_characteristic(eu),
+          betti_numbers(bn),
+          birth_deaths_by_dim(bd),
+          cell_count(cc) {}
+    index_t get_euler_characteristic() { return euler_characteristic; }
+
+    std::vector<size_t> get_betti_numbers() { return betti_numbers; }
+
+    size_t get_betti_numbers(size_t dimension) {
+      return betti_numbers[dimension];
+    }
+
+    std::vector<std::vector<std::pair<value_t, value_t>>>
+    get_persistence_diagram() {
+      return birth_deaths_by_dim;
+    }
+
+    std::vector<std::pair<value_t, value_t>> get_persistence_diagram(
+        size_t dimension) {
+      return birth_deaths_by_dim[dimension];
+    }
+
+    std::vector<size_t> get_cell_count() { return cell_count; }
+
+    size_t get_cell_count(size_t dimension) { return cell_count[dimension]; }
+
+   private:
+    index_t euler_characteristic = 0;
+    std::vector<size_t> betti_numbers;
+    std::vector<std::vector<std::pair<value_t, value_t>>> birth_deaths_by_dim;
+    std::vector<size_t> cell_count;
+  };
+
   m.doc() = "Python interface for flagser";
 
   m.attr("AVAILABLE_FILTRATIONS") = custom_filtration_computer;
 
-  using PersistenceComputer =
-      persistence_computer_t<directed_flag_complex_compute_t>;
-
-  py::class_<PersistenceComputer>(m, "PersistenceComputer", py::module_local())
+  py::class_<PersistenceValues>(m, "PersistenceValues", py::module_local())
       .def("get_euler_characteristic",
-           &PersistenceComputer::get_euler_characteristic)
+           &PersistenceValues::get_euler_characteristic)
       .def("get_betti_numbers",
-           py::overload_cast<>(&PersistenceComputer::get_betti_numbers))
+           py::overload_cast<>(&PersistenceValues::get_betti_numbers))
       .def("get_betti_numbers",
-           py::overload_cast<size_t>(&PersistenceComputer::get_betti_numbers))
+           py::overload_cast<size_t>(&PersistenceValues::get_betti_numbers))
       .def("get_cell_count",
-           py::overload_cast<>(&PersistenceComputer::get_cell_count))
+           py::overload_cast<>(&PersistenceValues::get_cell_count))
       .def("get_cell_count",
-           py::overload_cast<size_t>(&PersistenceComputer::get_cell_count))
+           py::overload_cast<size_t>(&PersistenceValues::get_cell_count))
       .def("get_persistence_diagram",
-           py::overload_cast<>(&PersistenceComputer::get_persistence_diagram))
+           py::overload_cast<>(&PersistenceValues::get_persistence_diagram))
       .def("get_persistence_diagram",
            py::overload_cast<size_t>(
-               &PersistenceComputer::get_persistence_diagram));
+               &PersistenceValues::get_persistence_diagram));
 
   m.def("compute_homology", [](std::vector<value_t>& vertices,
                                std::vector<std::vector<value_t>>& edges,
                                unsigned short min_dim, short max_dim,
                                bool directed, coefficient_t modulus,
-                               signed int approximation,
-                               std::string filtration) {
+                               signed int approximation, std::string filtration,
+                               bool in_memory) {
     flagser_parameters params;
 
     // Save std::cout status
@@ -78,6 +120,10 @@ PYBIND11_MODULE(flagser_pybind, m) {
     params.output_name = std::string("to_delete.flag");
     // Calls Trivial output, disable the generation of an output file
     params.output_format = std::string("none");
+
+    // Enable in memory computation for directed flags
+    // Threading memory for performances
+    params.input_format = in_memory;
 
     // Building the filtered directed graph
     auto graph = filtered_directed_graph_t(vertices, params.directed);
@@ -117,12 +163,37 @@ PYBIND11_MODULE(flagser_pybind, m) {
     // Disable cout
     std::cout.rdbuf(nullptr);
 
+    // Will contain Homology results
+    std::vector<PersistenceValues> vec_pv;
+
     // Running flagser's compute_homology routine
-    auto subgraph_persistence_computer = compute_homology(graph, params);
+    if (params.in_memory) {
+      auto subgraph_persistence_computer =
+          compute_homology<directed_flag_complex_in_memory_computer::
+                               directed_flag_complex_in_memory_computer_t>(
+              graph, params);
+      /* FIXME: right now, the loop needs to be duplicated because in order
+       * right now, it's not possible to create a vector of optional's
+       */
+      for (auto& sub : subgraph_persistence_computer)
+        vec_pv.emplace_back(PersistenceValues(
+            sub.get_euler_characteristic(), sub.get_betti_numbers(),
+            sub.get_persistence_diagram(), sub.get_cell_count()));
+
+    } else {
+      auto subgraph_persistence_computer = compute_homology<
+          directed_flag_complex_computer::directed_flag_complex_computer_t>(
+          graph, params);
+      /* FIXME: Remove when supported the duplicated loop */
+      for (auto& sub : subgraph_persistence_computer)
+        vec_pv.emplace_back(PersistenceValues(
+            sub.get_euler_characteristic(), sub.get_betti_numbers(),
+            sub.get_persistence_diagram(), sub.get_cell_count()));
+    }
 
     // Re-enable again cout
     std::cout.rdbuf(cout_buff);
 
-    return subgraph_persistence_computer;
+    return vec_pv;
   });
 }
