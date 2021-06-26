@@ -10,7 +10,7 @@ set(BINDINGS_DIR "src")
 # flagser
 pybind11_add_module(flagser_pybind "${BINDINGS_DIR}/flagser_bindings.cpp")
 
-target_compile_definitions(flagser_pybind PRIVATE RETRIEVE_PERSISTENCE=1)
+target_compile_definitions(flagser_pybind PRIVATE RETRIEVE_PERSISTENCE=1 MANY_VERTICES=1)
 target_include_directories(flagser_pybind PRIVATE .)
 
 if(MSVC)
@@ -24,7 +24,7 @@ endif()
 # flagser with USE_COEFFICIENTS
 pybind11_add_module(flagser_coeff_pybind "${BINDINGS_DIR}/flagser_bindings.cpp")
 
-target_compile_definitions(flagser_coeff_pybind PRIVATE RETRIEVE_PERSISTENCE=1 USE_COEFFICIENTS=1)
+target_compile_definitions(flagser_coeff_pybind PRIVATE RETRIEVE_PERSISTENCE=1 USE_COEFFICIENTS=1 MANY_VERTICES=1)
 target_include_directories(flagser_coeff_pybind PRIVATE .)
 
 if(MSVC)
@@ -40,6 +40,7 @@ endif()
 pybind11_add_module(flagser_count_pybind "${BINDINGS_DIR}/flagser_count_bindings.cpp")
 
 target_include_directories(flagser_count_pybind PRIVATE .)
+target_compile_definitions(flagser_count_pybind PRIVATE MANY_VERTICES=1)
 
 if(MSVC)
     target_compile_options(flagser_count_pybind PUBLIC $<$<CONFIG:RELEASE>: /Wall /O2>)
